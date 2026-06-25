@@ -1,0 +1,44 @@
+{
+    "name": "jguapin/approval-mapping",
+    "description": "Standalone approval mapping backend and UI package for Laravel.",
+    "type": "library",
+    "keywords": [
+        "laravel",
+        "approval",
+        "workflow",
+        "mapping"
+    ],
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Judywen Guapin",
+            "email": "jguapin21@gmail.com"
+        }
+    ],
+    "require": {
+        "php": "^8.2",
+        "illuminate/support": "^11.0|^12.0",
+        "illuminate/database": "^11.0|^12.0",
+        "illuminate/http": "^11.0|^12.0",
+        "illuminate/routing": "^11.0|^12.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Jguapin\\ApprovalMapping\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Jguapin\\ApprovalMapping\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Jguapin\\ApprovalMapping\\ApprovalMappingServiceProvider"
+            ]
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}
