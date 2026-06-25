@@ -5,6 +5,7 @@ namespace Jguapin\ApprovalMapping\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Jguapin\ApprovalMapping\Support\ModelResolver;
 
 class ApprovalMapping extends Model
 {
@@ -37,6 +38,13 @@ class ApprovalMapping extends Model
     public function approvalMappingLevel(): HasOne
     {
         return $this->hasOne(ApprovalMappingLevel::class, 'approval_mapping_id');
+    }
+
+    public function branch(): BelongsTo
+    {
+        $class = ModelResolver::modelClass('branch') ?? self::class;
+
+        return $this->belongsTo($class, 'branch_id');
     }
 
     public function getLevelGroups(): array

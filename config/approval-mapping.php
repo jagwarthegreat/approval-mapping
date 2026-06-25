@@ -22,5 +22,9 @@ return [
         'user' => \App\Models\User::class,
         'user_assign_group' => \App\Models\MDB\UserAssignGroup::class,
         'sidebar_menu' => \App\Models\MDB\SidebarMenu::class,
+        'company' => \App\Models\MDB\Company::class,
+        'business_unit' => \App\Models\MDB\BusinessUnit::class,
+        'branch' => \App\Models\MDB\Branch::class,
+        'department' => \App\Models\MDB\Department::class,
     ],
 ];

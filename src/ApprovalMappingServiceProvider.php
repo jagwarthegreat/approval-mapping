@@ -15,6 +15,10 @@ class ApprovalMappingServiceProvider extends ServiceProvider
         $this->app->singleton(ApprovalMappingService::class, function () {
             return new ApprovalMappingService;
         });
+
+        $this->app->singleton(\Jguapin\ApprovalMapping\Services\ApprovalMappingVersionService::class, function () {
+            return new \Jguapin\ApprovalMapping\Services\ApprovalMappingVersionService;
+        });
     }
 
     public function boot(): void
@@ -37,6 +41,10 @@ class ApprovalMappingServiceProvider extends ServiceProvider
 
         $this->publishes([
             __DIR__.'/../resources/js' => resource_path('js/vendor/approval-mapping'),
+        ], 'approval-mapping-assets');
+
+        $this->publishes([
+            __DIR__.'/../resources/css' => public_path('vendor/approval-mapping'),
         ], 'approval-mapping-assets');
 
         if ($this->app->runningInConsole()) {
