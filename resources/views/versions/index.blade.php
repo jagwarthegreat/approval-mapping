@@ -9,6 +9,12 @@
     <div class="am-toolbar">
         <button type="button" class="am-btn am-btn-icon" @click="showSearch = !showSearch" title="Search">&#128269;</button>
         <button type="button" class="am-btn am-btn-primary" @click="openCreateModal()">+ Add new</button>
+        <select class="am-select" x-model="filters.company_id" @change="onFilterCompanyChange()">
+            <option value="">Filter by company</option>
+            <template x-for="item in lookups.companies" :key="item.value">
+                <option :value="item.value" x-text="item.text"></option>
+            </template>
+        </select>
         <select class="am-select" x-model="filters.business_unit_id" @change="loadVersions(1)">
             <option value="">Filter by business unit</option>
             <template x-for="item in lookups.businessUnits" :key="item.value">
@@ -114,7 +120,7 @@
                     </div>
                     <div class="am-form-group">
                         <label>Company</label>
-                        <select class="am-select" x-model="versionForm.company_id" @change="loadBusinessUnits(versionForm.company_id)">
+                        <select class="am-select" x-model="versionForm.company_id" @change="onVersionCompanyChange()">
                             <option value="">Select company</option>
                             <template x-for="item in lookups.companies" :key="item.value">
                                 <option :value="item.value" x-text="item.text"></option>
@@ -218,7 +224,7 @@
                                     <td>
                                         <select class="am-select" x-model="row.branch_id">
                                             <option value="">Select branch</option>
-                                            <template x-for="branch in lookups.branches" :key="branch.value">
+                                            <template x-for="branch in detailBranchOptions()" :key="branch.value">
                                                 <option :value="branch.value" x-text="branch.text"></option>
                                             </template>
                                         </select>
@@ -308,8 +314,9 @@ function approvalMappingApp() {
         successMessage: '',
         versions: [],
         pagination: { current_page: 1, last_page: 1, per_page: 10, total: 0, from: 0, to: 0 },
-        filters: { search: '', business_unit_id: '', module_reference: '' },
-        lookups: { companies: [], businessUnits: [], modules: [], branches: [], userAssignGroups: [] },
+        filters: { search: '', company_id: '', business_unit_id: '', module_reference: '' },
+        lookups: { companies: [], businessUnits: [], modules: [], branches: [], departments: [], userAssignGroups: [] },
+        detailLookups: { branches: [], departments: [] },
         versionForm: { open: false, id: null, version: '', company_id: '', business_unit_id: '', module_reference: '', effective_from: '', effective_to: '', is_active: true, notes: '' },
         details: { open: false, version: null, level_columns: [1], rows: [], departmentSearch: '' },
         saveAsNew: { open: false, new_version: '', effective_from: '', notes: '' },
@@ -362,9 +369,51 @@ function approvalMappingApp() {
             this.lookups.userAssignGroups = userAssignGroups;
         },
 
-        async loadBusinessUnits(companyId) {
+        async loadBusinessUnits(companyId, target = 'lookups') {
             const params = companyId ? `?company_id=${companyId}` : '';
-            this.lookups.businessUnits = await this.request(`lookup/business-units${params}`);
+            const businessUnits = await this.request(`lookup/business-units${params}`);
+            if (target === 'lookups') {
+                this.lookups.businessUnits = businessUnits;
+            }
+            return businessUnits;
+        },
+
+        async loadBranches(companyId, businessUnitId, target = 'lookups') {
+            const params = new URLSearchParams();
+            if (companyId) params.set('company_id', companyId);
+            if (businessUnitId) params.set('business_unit_id', businessUnitId);
+            const query = params.toString() ? `?${params.toString()}` : '';
+            const branches = await this.request(`lookup/branches${query}`);
+            if (target === 'lookups') {
+                this.lookups.branches = branches;
+            } else if (target === 'detailLookups') {
+                this.detailLookups.branches = branches;
+            }
+            return branches;
+        },
+
+        async loadDepartments(companyId, businessUnitId, branchId = null, target = 'lookups') {
+            const params = new URLSearchParams();
+            if (companyId) params.set('company_id', companyId);
+            if (businessUnitId) params.set('business_unit_id', businessUnitId);
+            if (branchId) params.set('branch_id', branchId);
+            const query = params.toString() ? `?${params.toString()}` : '';
+            const departments = await this.request(`lookup/departments${query}`);
+            if (target === 'detailLookups') {
+                this.detailLookups.departments = departments;
+            }
+            return departments;
+        },
+
+        onFilterCompanyChange() {
+            this.filters.business_unit_id = '';
+            this.loadBusinessUnits(this.filters.company_id || '');
+            this.loadVersions(1);
+        },
+
+        onVersionCompanyChange() {
+            this.versionForm.business_unit_id = '';
+            this.loadBusinessUnits(this.versionForm.company_id || '');
         },
 
         async loadVersions(page = 1) {
@@ -375,6 +424,7 @@ function approvalMappingApp() {
                     page: String(page),
                     per_page: String(this.pagination.per_page),
                     search: this.filters.search || '',
+                    company_id: this.filters.company_id || '',
                     business_unit_id: this.filters.business_unit_id || '',
                     module_reference: this.filters.module_reference || '',
                 });
@@ -425,7 +475,7 @@ function approvalMappingApp() {
                 notes: version.notes || '',
             };
             if (version.company_id) {
-                this.loadBusinessUnits(version.company_id);
+                await this.loadBusinessUnits(version.company_id);
             }
         },
 
@@ -485,10 +535,20 @@ function approvalMappingApp() {
                     cells: this.normalizeCells(row.cells || {}, this.details.level_columns),
                 }));
                 this.details.departmentSearch = '';
+                const companyId = data.version?.company_id || '';
+                const businessUnitId = data.version?.business_unit_id || '';
+                await Promise.all([
+                    this.loadBranches(companyId, businessUnitId, 'detailLookups'),
+                    this.loadDepartments(companyId, businessUnitId, null, 'detailLookups'),
+                ]);
                 this.details.open = true;
             } catch (error) {
                 this.errorMessage = error.message;
             }
+        },
+
+        detailBranchOptions() {
+            return this.detailLookups.branches.length ? this.detailLookups.branches : this.lookups.branches;
         },
 
         normalizeCells(cells, levels) {

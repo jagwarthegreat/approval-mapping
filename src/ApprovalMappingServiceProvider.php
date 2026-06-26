@@ -16,8 +16,14 @@ class ApprovalMappingServiceProvider extends ServiceProvider
             return new ApprovalMappingService;
         });
 
-        $this->app->singleton(\Jguapin\ApprovalMapping\Services\ApprovalMappingVersionService::class, function () {
-            return new \Jguapin\ApprovalMapping\Services\ApprovalMappingVersionService;
+        $this->app->singleton(\Jguapin\ApprovalMapping\Services\ApprovalMappingLookupService::class, function () {
+            return new \Jguapin\ApprovalMapping\Services\ApprovalMappingLookupService;
+        });
+
+        $this->app->singleton(\Jguapin\ApprovalMapping\Services\ApprovalMappingVersionService::class, function ($app) {
+            return new \Jguapin\ApprovalMapping\Services\ApprovalMappingVersionService(
+                $app->make(\Jguapin\ApprovalMapping\Services\ApprovalMappingLookupService::class)
+            );
         });
     }
 

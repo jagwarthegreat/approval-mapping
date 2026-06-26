@@ -3,7 +3,6 @@
 namespace Jguapin\ApprovalMapping\Services;
 
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Jguapin\ApprovalMapping\Models\ApprovalMapping;
 use Jguapin\ApprovalMapping\Models\ApprovalMappingLevel;
@@ -12,6 +11,8 @@ use Jguapin\ApprovalMapping\Support\ModelResolver;
 
 class ApprovalMappingVersionService
 {
+    public function __construct(private readonly ApprovalMappingLookupService $lookupService) {}
+
     public function paginateVersions(array $filters = [], int $perPage = 10): LengthAwarePaginator
     {
         $query = ApprovalMappingVersion::query()
@@ -24,6 +25,10 @@ class ApprovalMappingVersionService
                 $builder->whereRaw('LOWER(version) LIKE ?', [$keyword])
                     ->orWhereRaw('LOWER(COALESCE(notes, \'\')) LIKE ?', [$keyword]);
             });
+        }
+
+        if (! empty($filters['company_id'])) {
+            $query->where('company_id', (int) $filters['company_id']);
         }
 
         if (! empty($filters['business_unit_id'])) {
@@ -45,6 +50,7 @@ class ApprovalMappingVersionService
     {
         $isActive = (bool) ($payload['is_active'] ?? false);
         $payload['is_active'] = false;
+        $payload = $this->applyModulePayload($payload);
 
         $version = ApprovalMappingVersion::create($payload);
 
@@ -60,6 +66,10 @@ class ApprovalMappingVersionService
         if (! empty($payload['is_active'])) {
             $this->activate($version);
             unset($payload['is_active']);
+        }
+
+        if (array_key_exists('module_reference', $payload)) {
+            $payload = $this->applyModulePayload($payload);
         }
 
         $version->update($payload);
@@ -94,7 +104,10 @@ class ApprovalMappingVersionService
         $mappedRows = $this->mappedRowsFromVersion($version, $levelColumns);
         $rows = [];
 
-        $departments = $this->departments();
+        $departments = $this->lookupService->departmentsForVersion(
+            $version->company_id ? (int) $version->company_id : null,
+            $version->business_unit_id ? (int) $version->business_unit_id : null
+        );
         if ($departments->isNotEmpty()) {
             foreach ($departments as $department) {
                 $label = $this->departmentLabel($department);
@@ -230,22 +243,7 @@ class ApprovalMappingVersionService
 
     public function lookup(string $type, array $params = []): array
     {
-        return match ($type) {
-            'companies' => $this->mapOptions(ModelResolver::query('company'), 'id', ['name', 'company_code']),
-            'business-units' => $this->mapOptions(
-                ModelResolver::query('business_unit')?->when(! empty($params['company_id']), fn ($q) => $q->where('company_id', (int) $params['company_id'])),
-                'id',
-                ['name', 'bus_unit_code']
-            ),
-            'branches' => $this->mapOptions(ModelResolver::query('branch'), 'id', ['name', 'branch_code']),
-            'departments' => $this->departments()->map(fn ($item) => [
-                'value' => $this->departmentLabel($item),
-                'text' => $this->departmentLabel($item),
-            ])->values()->all(),
-            'modules' => $this->mapOptions(ModelResolver::query('sidebar_menu'), 'reference', ['name', 'code'], 'reference'),
-            'user-assign-groups' => $this->mapOptions(ModelResolver::query('user_assign_group'), 'id', ['group_name']),
-            default => [],
-        };
+        return $this->lookupService->lookup($type, $params);
     }
 
     private function relationNames(): array
@@ -318,16 +316,6 @@ class ApprovalMappingVersionService
         return $cells;
     }
 
-    private function departments(): Collection
-    {
-        $query = ModelResolver::query('department');
-        if (! $query) {
-            return collect();
-        }
-
-        return $query->orderBy('name')->get();
-    }
-
     private function departmentLabel(object $department): string
     {
         $code = trim((string) ($department->department_code ?? ''));
@@ -336,25 +324,24 @@ class ApprovalMappingVersionService
         return $code !== '' ? "[{$code}] {$name}" : $name;
     }
 
-    private function mapOptions(?\Illuminate\Database\Eloquent\Builder $query, string $valueKey, array $labelKeys, ?string $valueField = null): array
+    private function applyModulePayload(array $payload): array
     {
-        if (! $query) {
-            return [];
+        if (! array_key_exists('module_reference', $payload)) {
+            return $payload;
         }
 
-        return $query->orderBy($labelKeys[0])->get()->map(function ($row) use ($valueKey, $labelKeys, $valueField) {
-            $label = '';
-            foreach ($labelKeys as $key) {
-                if (! empty($row->{$key})) {
-                    $label = (string) $row->{$key};
-                    break;
-                }
-            }
+        $moduleReference = $payload['module_reference'] ?: null;
+        if (! $moduleReference) {
+            $payload['module_id'] = null;
+            $payload['module_reference'] = null;
 
-            return [
-                'value' => $row->{$valueField ?? $valueKey},
-                'text' => $label !== '' ? $label : (string) $row->{$valueKey},
-            ];
-        })->values()->all();
+            return $payload;
+        }
+
+        $module = ModelResolver::query('sidebar_menu')?->where('reference', $moduleReference)->first();
+        $payload['module_id'] = $module?->id;
+        $payload['module_reference'] = $module?->reference;
+
+        return $payload;
     }
 }
