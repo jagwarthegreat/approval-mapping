@@ -219,14 +219,16 @@
                             <template x-for="(group, groupIndex) in filteredDetailGroups()" :key="'group-' + groupIndex + '-' + group.department">
                                 <template x-for="(subRow, subRowIndex) in group.subRows" :key="'subrow-' + groupIndex + '-' + subRowIndex">
                                     <tr>
-                                        <td x-show="appFeatures.department">
-                                            <template x-if="subRowIndex === 0 && group._new">
-                                                <input type="text" class="am-input" x-model="group.department" placeholder="Department name">
-                                            </template>
-                                            <template x-if="subRowIndex === 0 && !group._new">
-                                                <span x-text="group.department"></span>
-                                            </template>
-                                        </td>
+                                        <template x-if="subRowIndex === 0">
+                                            <td x-show="appFeatures.department" :rowspan="group.subRows.length">
+                                                <template x-if="group._new">
+                                                    <input type="text" class="am-input" x-model="group.department" placeholder="Department name">
+                                                </template>
+                                                <template x-if="!group._new">
+                                                    <span x-text="group.department"></span>
+                                                </template>
+                                            </td>
+                                        </template>
                                         <td x-show="appFeatures.branch">
                                             <select class="am-select" x-model="subRow.branch_id">
                                                 <option value="">Select branch</option>
