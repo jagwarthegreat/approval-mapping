@@ -10,8 +10,15 @@ class ApprovalMappingWebController extends Controller
     public function index(): View
     {
         return view('approval-mapping::versions.index', [
-            'apiBase' => url(trim(config('approval-mapping.route.web_prefix', 'approval-mapping'), '/').'/api'),
-            'csrfToken' => csrf_token(),
+            'apiBase'    => url(trim(config('approval-mapping.route.web_prefix', 'approval-mapping'), '/').'/api'),
+            'csrfToken'  => csrf_token(),
+            'features'   => config('approval-mapping.features', [
+                'company'       => true,
+                'business_unit' => true,
+                'branch'        => true,
+                'department'    => true,
+                'module'        => true,
+            ]),
         ]);
     }
 }

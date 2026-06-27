@@ -137,16 +137,23 @@ class ApprovalMappingVersionService
         $version->load('module');
         $moduleStr = $version->module_code ?? '';
 
-        DB::transaction(function () use ($version, $rows, $moduleStr) {
+        $branchEnabled     = \Jguapin\ApprovalMapping\Support\ModelResolver::isEnabled('branch');
+        $departmentEnabled = \Jguapin\ApprovalMapping\Support\ModelResolver::isEnabled('department');
+
+        DB::transaction(function () use ($version, $rows, $moduleStr, $branchEnabled, $departmentEnabled) {
             $processedKeys = [];
 
             foreach ($rows as $row) {
                 $department = trim((string) ($row['department'] ?? ''));
-                $branchId = (int) ($row['branch_id'] ?? 0);
-                $type = strtolower((string) ($row['type'] ?? 'direct')) === 'agency' ? 'agency' : 'direct';
-                $levels = (array) ($row['levels'] ?? $row['cells'] ?? []);
+                $branchId   = (int) ($row['branch_id'] ?? 0);
+                $type       = strtolower((string) ($row['type'] ?? 'direct')) === 'agency' ? 'agency' : 'direct';
+                $levels     = (array) ($row['levels'] ?? $row['cells'] ?? []);
 
-                if ($department === '' || ! $branchId) {
+                if ($departmentEnabled && $department === '') {
+                    continue;
+                }
+
+                if ($branchEnabled && ! $branchId) {
                     continue;
                 }
 
@@ -248,9 +255,18 @@ class ApprovalMappingVersionService
 
     private function relationNames(): array
     {
+        $featureMap = [
+            'company'      => 'company',
+            'businessUnit' => 'business_unit',
+            'module'       => 'module',
+        ];
+
         $relations = [];
-        foreach (['company', 'businessUnit', 'module'] as $relation) {
-            if (ApprovalMappingVersion::relationModelClass($relation)) {
+        foreach ($featureMap as $relation => $featureKey) {
+            if (
+                \Jguapin\ApprovalMapping\Support\ModelResolver::isEnabled($featureKey)
+                && ApprovalMappingVersion::relationModelClass($relation) !== \Illuminate\Database\Eloquent\Model::class
+            ) {
                 $relations[] = $relation;
             }
         }
@@ -330,6 +346,13 @@ class ApprovalMappingVersionService
             return $payload;
         }
 
+        if (! \Jguapin\ApprovalMapping\Support\ModelResolver::isEnabled('module')) {
+            $payload['module_id'] = null;
+            $payload['module_reference'] = null;
+
+            return $payload;
+        }
+
         $moduleReference = $payload['module_reference'] ?: null;
         if (! $moduleReference) {
             $payload['module_id'] = null;
@@ -338,9 +361,11 @@ class ApprovalMappingVersionService
             return $payload;
         }
 
-        $module = ModelResolver::query('sidebar_menu')?->where('reference', $moduleReference)->first();
+        $referenceField = \Jguapin\ApprovalMapping\Support\ModelResolver::fieldMap('module', 'reference', 'reference');
+        $query = ModelResolver::query('sidebar_menu') ?? ModelResolver::query('module');
+        $module = $query?->where($referenceField, $moduleReference)->first();
         $payload['module_id'] = $module?->id;
-        $payload['module_reference'] = $module?->reference;
+        $payload['module_reference'] = $module?->{$referenceField};
 
         return $payload;
     }

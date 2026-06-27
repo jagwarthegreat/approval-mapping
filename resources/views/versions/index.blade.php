@@ -9,19 +9,19 @@
     <div class="am-toolbar">
         <button type="button" class="am-btn am-btn-icon" @click="showSearch = !showSearch" title="Search">&#128269;</button>
         <button type="button" class="am-btn am-btn-primary" @click="openCreateModal()">+ Add new</button>
-        <select class="am-select" x-model="filters.company_id" @change="onFilterCompanyChange()">
+        <select class="am-select" x-show="appFeatures.company" x-model="filters.company_id" @change="onFilterCompanyChange()">
             <option value="">Filter by company</option>
             <template x-for="item in lookups.companies" :key="item.value">
                 <option :value="item.value" x-text="item.text"></option>
             </template>
         </select>
-        <select class="am-select" x-model="filters.business_unit_id" @change="loadVersions(1)">
+        <select class="am-select" x-show="appFeatures.business_unit" x-model="filters.business_unit_id" @change="loadVersions(1)">
             <option value="">Filter by business unit</option>
             <template x-for="item in lookups.businessUnits" :key="item.value">
                 <option :value="item.value" x-text="item.text"></option>
             </template>
         </select>
-        <select class="am-select" x-model="filters.module_reference" @change="loadVersions(1)">
+        <select class="am-select" x-show="appFeatures.module" x-model="filters.module_reference" @change="loadVersions(1)">
             <option value="">Filter by module</option>
             <template x-for="item in lookups.modules" :key="item.value">
                 <option :value="item.value" x-text="item.text"></option>
@@ -30,7 +30,7 @@
     </div>
 
     <div class="am-search-row" x-show="showSearch" x-cloak>
-        <input type="text" class="am-input" placeholder="Search version, notes, company..." x-model="filters.search" @keydown.enter="loadVersions(1)">
+        <input type="text" class="am-input" placeholder="Search version, notes..." x-model="filters.search" @keydown.enter="loadVersions(1)">
         <button type="button" class="am-btn" @click="loadVersions(1)">Search</button>
     </div>
 
@@ -43,9 +43,9 @@
                 <thead>
                     <tr>
                         <th>Version</th>
-                        <th>Company</th>
-                        <th>Business Unit</th>
-                        <th>Module</th>
+                        <th x-show="appFeatures.company">Company</th>
+                        <th x-show="appFeatures.business_unit">Business Unit</th>
+                        <th x-show="appFeatures.module">Module</th>
                         <th>Effective from</th>
                         <th>Effective to</th>
                         <th>Status</th>
@@ -55,17 +55,17 @@
                 </thead>
                 <tbody>
                     <template x-if="loading">
-                        <tr><td colspan="9">Loading...</td></tr>
+                        <tr><td :colspan="tableColspan()">Loading...</td></tr>
                     </template>
                     <template x-if="!loading && versions.length === 0">
-                        <tr><td colspan="9">No approval mapping versions found.</td></tr>
+                        <tr><td :colspan="tableColspan()">No approval mapping versions found.</td></tr>
                     </template>
                     <template x-for="version in versions" :key="version.id">
                         <tr>
                             <td x-text="version.version"></td>
-                            <td x-text="version.company?.name || '-'"></td>
-                            <td x-text="version.business_unit?.name || '-'"></td>
-                            <td x-text="moduleLabel(version)"></td>
+                            <td x-show="appFeatures.company" x-text="version.company?.name || '-'"></td>
+                            <td x-show="appFeatures.business_unit" x-text="version.business_unit?.name || '-'"></td>
+                            <td x-show="appFeatures.module" x-text="moduleLabel(version)"></td>
                             <td x-text="formatDate(version.effective_from)"></td>
                             <td x-text="version.effective_to ? formatDate(version.effective_to) : '-'"></td>
                             <td>
@@ -118,7 +118,7 @@
                         <label>Version</label>
                         <input type="text" class="am-input" x-model="versionForm.version">
                     </div>
-                    <div class="am-form-group">
+                    <div class="am-form-group" x-show="appFeatures.company">
                         <label>Company</label>
                         <select class="am-select" x-model="versionForm.company_id" @change="onVersionCompanyChange()">
                             <option value="">Select company</option>
@@ -127,7 +127,7 @@
                             </template>
                         </select>
                     </div>
-                    <div class="am-form-group">
+                    <div class="am-form-group" x-show="appFeatures.business_unit">
                         <label>Business Unit</label>
                         <select class="am-select" x-model="versionForm.business_unit_id">
                             <option value="">Select business unit</option>
@@ -136,7 +136,7 @@
                             </template>
                         </select>
                     </div>
-                    <div class="am-form-group">
+                    <div class="am-form-group" x-show="appFeatures.module">
                         <label>Module</label>
                         <select class="am-select" x-model="versionForm.module_reference">
                             <option value="">Select module</option>
@@ -185,13 +185,13 @@
                     <div><strong>Version</strong><span x-text="details.version?.version || '-'"></span></div>
                     <div><strong>Effective from</strong><span x-text="formatDate(details.version?.effective_from)"></span></div>
                     <div><strong>Effective to</strong><span x-text="details.version?.effective_to ? formatDate(details.version.effective_to) : '-'"></span></div>
-                    <div><strong>Company</strong><span x-text="details.version?.company?.name || '-'"></span></div>
-                    <div><strong>Business Unit</strong><span x-text="details.version?.business_unit?.name || '-'"></span></div>
-                    <div><strong>Module</strong><span x-text="moduleLabel(details.version) || '-'"></span></div>
+                    <div x-show="appFeatures.company"><strong>Company</strong><span x-text="details.version?.company?.name || '-'"></span></div>
+                    <div x-show="appFeatures.business_unit"><strong>Business Unit</strong><span x-text="details.version?.business_unit?.name || '-'"></span></div>
+                    <div x-show="appFeatures.module"><strong>Module</strong><span x-text="moduleLabel(details.version) || '-'"></span></div>
                     <div><strong>Status</strong><span class="am-badge am-badge-active" x-show="details.version?.is_active">Active</span><span class="am-badge am-badge-inactive" x-show="!details.version?.is_active">Inactive</span></div>
                 </div>
 
-                <div class="am-search-row">
+                <div class="am-search-row" x-show="appFeatures.department">
                     <span>&#128269;</span>
                     <input type="text" class="am-input" placeholder="Search department..." x-model="details.departmentSearch">
                 </div>
@@ -200,8 +200,8 @@
                     <table class="am-table">
                         <thead>
                             <tr>
-                                <th>Department</th>
-                                <th>Branch</th>
+                                <th x-show="appFeatures.department">Department</th>
+                                <th x-show="appFeatures.branch">Branch</th>
                                 <th>Type</th>
                                 <template x-for="level in details.level_columns" :key="'head-' + level">
                                     <th>
@@ -220,8 +220,15 @@
                         <tbody>
                             <template x-for="(row, rowIndex) in filteredDetailRows()" :key="rowIndex + '-' + row.department">
                                 <tr>
-                                    <td x-text="row.department"></td>
-                                    <td>
+                                    <td x-show="appFeatures.department">
+                                        <template x-if="row._new">
+                                            <input type="text" class="am-input" x-model="row.department" placeholder="Department name">
+                                        </template>
+                                        <template x-if="!row._new">
+                                            <span x-text="row.department"></span>
+                                        </template>
+                                    </td>
+                                    <td x-show="appFeatures.branch">
                                         <select class="am-select" x-model="row.branch_id">
                                             <option value="">Select branch</option>
                                             <template x-for="branch in detailBranchOptions()" :key="branch.value">
@@ -308,6 +315,7 @@ function approvalMappingApp() {
     return {
         apiBase: @json($apiBase),
         csrfToken: @json($csrfToken),
+        appFeatures: @json($features),
         loading: false,
         showSearch: false,
         errorMessage: '',
@@ -354,22 +362,31 @@ function approvalMappingApp() {
         },
 
         async loadLookups() {
-            const [companies, businessUnits, modules, branches, userAssignGroups] = await Promise.all([
-                this.request('lookup/companies'),
-                this.request('lookup/business-units'),
-                this.request('lookup/modules'),
-                this.request('lookup/branches'),
-                this.request('lookup/user-assign-groups'),
-            ]);
+            const promises = [
+                this.request('lookup/user-assign-groups').then(v => { this.lookups.userAssignGroups = v; }),
+            ];
 
-            this.lookups.companies = companies;
-            this.lookups.businessUnits = businessUnits;
-            this.lookups.modules = modules;
-            this.lookups.branches = branches;
-            this.lookups.userAssignGroups = userAssignGroups;
+            if (this.appFeatures.company) {
+                promises.push(this.request('lookup/companies').then(v => { this.lookups.companies = v; }));
+            }
+
+            if (this.appFeatures.business_unit) {
+                promises.push(this.request('lookup/business-units').then(v => { this.lookups.businessUnits = v; }));
+            }
+
+            if (this.appFeatures.module) {
+                promises.push(this.request('lookup/modules').then(v => { this.lookups.modules = v; }));
+            }
+
+            if (this.appFeatures.branch) {
+                promises.push(this.request('lookup/branches').then(v => { this.lookups.branches = v; }));
+            }
+
+            await Promise.all(promises);
         },
 
         async loadBusinessUnits(companyId, target = 'lookups') {
+            if (!this.appFeatures.business_unit) return [];
             const params = companyId ? `?company_id=${companyId}` : '';
             const businessUnits = await this.request(`lookup/business-units${params}`);
             if (target === 'lookups') {
@@ -379,6 +396,7 @@ function approvalMappingApp() {
         },
 
         async loadBranches(companyId, businessUnitId, target = 'lookups') {
+            if (!this.appFeatures.branch) return [];
             const params = new URLSearchParams();
             if (companyId) params.set('company_id', companyId);
             if (businessUnitId) params.set('business_unit_id', businessUnitId);
@@ -393,6 +411,7 @@ function approvalMappingApp() {
         },
 
         async loadDepartments(companyId, businessUnitId, branchId = null, target = 'lookups') {
+            if (!this.appFeatures.department) return [];
             const params = new URLSearchParams();
             if (companyId) params.set('company_id', companyId);
             if (businessUnitId) params.set('business_unit_id', businessUnitId);
@@ -407,13 +426,17 @@ function approvalMappingApp() {
 
         onFilterCompanyChange() {
             this.filters.business_unit_id = '';
-            this.loadBusinessUnits(this.filters.company_id || '');
+            if (this.appFeatures.business_unit) {
+                this.loadBusinessUnits(this.filters.company_id || '');
+            }
             this.loadVersions(1);
         },
 
         onVersionCompanyChange() {
             this.versionForm.business_unit_id = '';
-            this.loadBusinessUnits(this.versionForm.company_id || '');
+            if (this.appFeatures.business_unit) {
+                this.loadBusinessUnits(this.versionForm.company_id || '');
+            }
         },
 
         async loadVersions(page = 1) {
@@ -424,10 +447,17 @@ function approvalMappingApp() {
                     page: String(page),
                     per_page: String(this.pagination.per_page),
                     search: this.filters.search || '',
-                    company_id: this.filters.company_id || '',
-                    business_unit_id: this.filters.business_unit_id || '',
-                    module_reference: this.filters.module_reference || '',
                 });
+
+                if (this.appFeatures.company && this.filters.company_id) {
+                    params.set('company_id', this.filters.company_id);
+                }
+                if (this.appFeatures.business_unit && this.filters.business_unit_id) {
+                    params.set('business_unit_id', this.filters.business_unit_id);
+                }
+                if (this.appFeatures.module && this.filters.module_reference) {
+                    params.set('module_reference', this.filters.module_reference);
+                }
 
                 const data = await this.request(`versions?${params.toString()}`);
                 this.versions = data.data || [];
@@ -461,7 +491,7 @@ function approvalMappingApp() {
             };
         },
 
-        openEditModal(version) {
+        async openEditModal(version) {
             this.versionForm = {
                 open: true,
                 id: version.id,
@@ -474,7 +504,7 @@ function approvalMappingApp() {
                 is_active: !!version.is_active,
                 notes: version.notes || '',
             };
-            if (version.company_id) {
+            if (version.company_id && this.appFeatures.business_unit) {
                 await this.loadBusinessUnits(version.company_id);
             }
         },
@@ -484,9 +514,9 @@ function approvalMappingApp() {
             try {
                 const payload = {
                     version: this.versionForm.version,
-                    company_id: this.versionForm.company_id || null,
-                    business_unit_id: this.versionForm.business_unit_id || null,
-                    module_reference: this.versionForm.module_reference || null,
+                    company_id: this.appFeatures.company ? (this.versionForm.company_id || null) : null,
+                    business_unit_id: this.appFeatures.business_unit ? (this.versionForm.business_unit_id || null) : null,
+                    module_reference: this.appFeatures.module ? (this.versionForm.module_reference || null) : null,
                     effective_from: this.versionForm.effective_from,
                     effective_to: this.versionForm.effective_to || null,
                     is_active: this.versionForm.is_active,
@@ -533,14 +563,23 @@ function approvalMappingApp() {
                     branch_id: row.branch_id || '',
                     type: row.type || 'direct',
                     cells: this.normalizeCells(row.cells || {}, this.details.level_columns),
+                    _new: false,
                 }));
                 this.details.departmentSearch = '';
-                const companyId = data.version?.company_id || '';
-                const businessUnitId = data.version?.business_unit_id || '';
-                await Promise.all([
-                    this.loadBranches(companyId, businessUnitId, 'detailLookups'),
-                    this.loadDepartments(companyId, businessUnitId, null, 'detailLookups'),
-                ]);
+
+                const loaders = [];
+                if (this.appFeatures.branch) {
+                    const companyId = data.version?.company_id || '';
+                    const businessUnitId = data.version?.business_unit_id || '';
+                    loaders.push(this.loadBranches(companyId, businessUnitId, 'detailLookups'));
+                }
+                if (this.appFeatures.department) {
+                    const companyId = data.version?.company_id || '';
+                    const businessUnitId = data.version?.business_unit_id || '';
+                    loaders.push(this.loadDepartments(companyId, businessUnitId, null, 'detailLookups'));
+                }
+
+                await Promise.all(loaders);
                 this.details.open = true;
             } catch (error) {
                 this.errorMessage = error.message;
@@ -561,11 +600,13 @@ function approvalMappingApp() {
         },
 
         filteredDetailRows() {
+            if (!this.appFeatures.department) {
+                return this.details.rows;
+            }
             const keyword = (this.details.departmentSearch || '').toLowerCase();
             if (!keyword) {
                 return this.details.rows;
             }
-
             return this.details.rows.filter(row => (row.department || '').toLowerCase().includes(keyword));
         },
 
@@ -604,16 +645,21 @@ function approvalMappingApp() {
             const cells = {};
             this.details.level_columns.forEach(level => cells[level] = ['']);
             this.details.rows.push({
-                department: 'New Department',
+                department: this.appFeatures.department ? '' : 'Default',
                 branch_id: '',
                 type: 'direct',
                 cells,
+                _new: true,
             });
         },
 
         buildRowsPayload() {
             return this.details.rows
-                .filter(row => row.department && row.branch_id)
+                .filter(row => {
+                    const hasDept = this.appFeatures.department ? !!row.department : true;
+                    const hasBranch = this.appFeatures.branch ? !!row.branch_id : true;
+                    return hasDept && hasBranch;
+                })
                 .map(row => {
                     const levels = {};
                     this.details.level_columns.forEach(level => {
@@ -623,8 +669,8 @@ function approvalMappingApp() {
                     });
 
                     return {
-                        department: row.department,
-                        branch_id: parseInt(row.branch_id, 10),
+                        department: row.department || 'Default',
+                        branch_id: this.appFeatures.branch ? parseInt(row.branch_id, 10) : 0,
                         type: row.type || 'direct',
                         levels,
                     };
@@ -681,6 +727,14 @@ function approvalMappingApp() {
             } catch (error) {
                 this.errorMessage = error.message;
             }
+        },
+
+        tableColspan() {
+            let cols = 5; // version, effective_from, effective_to, status, notes, actions = 6 always
+            if (this.appFeatures.company) cols++;
+            if (this.appFeatures.business_unit) cols++;
+            if (this.appFeatures.module) cols++;
+            return cols + 1; // +1 for actions
         },
 
         formatDate(value) {

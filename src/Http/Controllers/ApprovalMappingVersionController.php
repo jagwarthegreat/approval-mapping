@@ -83,13 +83,16 @@ class ApprovalMappingVersionController extends Controller
 
     public function saveMappingsLevels(Request $request, ApprovalMappingVersion $version): JsonResponse
     {
+        $branchEnabled     = \Jguapin\ApprovalMapping\Support\ModelResolver::isEnabled('branch');
+        $departmentEnabled = \Jguapin\ApprovalMapping\Support\ModelResolver::isEnabled('department');
+
         $validated = $request->validate([
-            'rows' => ['required', 'array'],
-            'rows.*.department' => ['required', 'string', 'max:255'],
-            'rows.*.branch_id' => ['required', 'integer'],
-            'rows.*.type' => ['required', 'in:direct,agency'],
-            'rows.*.levels' => ['sometimes', 'array'],
-            'rows.*.cells' => ['sometimes', 'array'],
+            'rows'              => ['required', 'array'],
+            'rows.*.department' => [$departmentEnabled ? 'required' : 'nullable', 'string', 'max:255'],
+            'rows.*.branch_id'  => [$branchEnabled ? 'required' : 'nullable', 'integer'],
+            'rows.*.type'       => ['required', 'in:direct,agency'],
+            'rows.*.levels'     => ['sometimes', 'array'],
+            'rows.*.cells'      => ['sometimes', 'array'],
         ]);
 
         $this->service->saveMappingsLevels($version, $validated['rows']);

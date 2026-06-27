@@ -25,8 +25,8 @@ class ApprovalMappingVersion extends Model
 
     protected $casts = [
         'effective_from' => 'date',
-        'effective_to' => 'date',
-        'is_active' => 'boolean',
+        'effective_to'   => 'date',
+        'is_active'      => 'boolean',
     ];
 
     protected $appends = [
@@ -51,15 +51,19 @@ class ApprovalMappingVersion extends Model
 
     public function module(): BelongsTo
     {
-        $class = self::relationModelClass('module');
+        $class          = self::relationModelClass('module');
+        $referenceField = ModelResolver::fieldMap('module', 'reference', 'reference');
 
-        return $this->belongsTo($class, 'module_reference', 'reference');
+        return $this->belongsTo($class, 'module_reference', $referenceField);
     }
 
     public function getModuleCodeAttribute(): ?string
     {
         if ($this->relationLoaded('module') && $this->module) {
-            return $this->module->code ?? $this->module->name ?? null;
+            $codeField  = ModelResolver::fieldMap('module', 'code', 'code');
+            $labelField = ModelResolver::fieldMap('module', 'label', 'name');
+
+            return $this->module->{$codeField} ?? $this->module->{$labelField} ?? null;
         }
 
         return null;
@@ -67,10 +71,23 @@ class ApprovalMappingVersion extends Model
 
     public function getSupportsSyncAttribute(): bool
     {
-        return (bool) $this->is_active
-            && $this->company_id
-            && $this->business_unit_id
-            && $this->module_reference;
+        if (! $this->is_active) {
+            return false;
+        }
+
+        if (ModelResolver::isEnabled('company') && ! $this->company_id) {
+            return false;
+        }
+
+        if (ModelResolver::isEnabled('business_unit') && ! $this->business_unit_id) {
+            return false;
+        }
+
+        if (ModelResolver::isEnabled('module') && ! $this->module_reference) {
+            return false;
+        }
+
+        return true;
     }
 
     public function getLevelColumns(): array
@@ -97,12 +114,17 @@ class ApprovalMappingVersion extends Model
     public static function relationModelClass(string $relation): string
     {
         $map = [
-            'company' => 'company',
+            'company'      => 'company',
             'businessUnit' => 'business_unit',
-            'module' => 'sidebar_menu',
+            'module'       => 'sidebar_menu',
         ];
 
-        return ModelResolver::modelClass($map[$relation]) ?? Model::class;
+        // Fall back to 'module' model key if sidebar_menu is not configured
+        if ($relation === 'module' && ! ModelResolver::modelClass('sidebar_menu')) {
+            return ModelResolver::modelClass('module') ?? Model::class;
+        }
+
+        return ModelResolver::modelClass($map[$relation] ?? '') ?? Model::class;
     }
 
     public function getConnectionName()

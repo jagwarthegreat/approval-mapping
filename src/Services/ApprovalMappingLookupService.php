@@ -12,27 +12,30 @@ class ApprovalMappingLookupService
     public function lookup(string $type, array $params = []): array
     {
         return match ($type) {
-            'companies' => $this->companies($params),
-            'business-units' => $this->businessUnits($params),
-            'branches' => $this->branches($params),
-            'departments' => $this->departments($params),
-            'modules' => $this->modules($params),
-            'user-assign-groups' => $this->mapOptions(
-                ModelResolver::query('user_assign_group'),
-                'id',
-                ['group_name']
-            ),
-            default => [],
+            'companies'          => $this->companies($params),
+            'business-units'     => $this->businessUnits($params),
+            'branches'           => $this->branches($params),
+            'departments'        => $this->departments($params),
+            'modules'            => $this->modules($params),
+            'user-assign-groups' => $this->userAssignGroups(),
+            default              => [],
         };
     }
 
     public function departmentsForVersion(?int $companyId, ?int $businessUnitId): Collection
     {
-        if ($companyId && $businessUnitId) {
+        if (! ModelResolver::isEnabled('department')) {
+            return collect();
+        }
+
+        if (
+            ModelResolver::isEnabled('company') && ModelResolver::isEnabled('business_unit')
+            && $companyId && $businessUnitId
+        ) {
             $scoped = $this->departmentsFromMapping($companyId, $businessUnitId, null);
             if ($scoped !== []) {
                 return collect($scoped)->map(fn (array $item) => (object) [
-                    'name' => $item['text'],
+                    'name'            => $item['text'],
                     'department_code' => $this->extractCodeFromLabel($item['text']),
                 ]);
             }
@@ -43,128 +46,182 @@ class ApprovalMappingLookupService
 
     private function companies(array $params): array
     {
+        if (! ModelResolver::isEnabled('company')) {
+            return [];
+        }
+
         $query = ModelResolver::query('company');
         if (! $query) {
             return [];
         }
 
+        $labelField = ModelResolver::fieldMap('company', 'label', 'name');
+        $codeField  = ModelResolver::fieldMap('company', 'code', 'company_code');
+
         if (! empty($params['search'])) {
             $keyword = '%'.strtolower((string) $params['search']).'%';
-            $query->where(function (Builder $builder) use ($keyword) {
-                $builder->whereRaw('LOWER(name) LIKE ?', [$keyword])
-                    ->orWhereRaw('LOWER(COALESCE(company_code, \'\')) LIKE ?', [$keyword]);
+            $query->where(function (Builder $builder) use ($keyword, $labelField, $codeField) {
+                $builder->whereRaw("LOWER({$labelField}) LIKE ?", [$keyword])
+                    ->orWhereRaw("LOWER(COALESCE({$codeField}, '')) LIKE ?", [$keyword]);
             });
         }
 
-        return $query->orderBy('name')->get()->map(function ($row) {
+        return $query->orderBy($labelField)->get()->map(function ($row) use ($labelField, $codeField) {
             return [
                 'value' => $row->id,
-                'text' => $this->formatCodeName($row->company_code ?? '', $row->name ?? ''),
+                'text'  => $this->formatCodeName($row->{$codeField} ?? '', $row->{$labelField} ?? ''),
             ];
         })->values()->all();
     }
 
     private function businessUnits(array $params): array
     {
+        if (! ModelResolver::isEnabled('business_unit')) {
+            return [];
+        }
+
         $companyId = ! empty($params['company_id']) ? (int) $params['company_id'] : null;
-        if ($companyId) {
+
+        if ($companyId && ModelResolver::isEnabled('company')) {
             $scoped = $this->businessUnitsByCompany($companyId);
             if ($scoped !== []) {
                 return $scoped;
             }
         }
 
+        $codeField  = ModelResolver::fieldMap('business_unit', 'code', 'bus_unit_code');
+        $labelField = ModelResolver::fieldMap('business_unit', 'label', 'name');
+
         return $this->mapOptions(
             ModelResolver::query('business_unit'),
             'id',
-            ['name', 'bus_unit_code'],
+            [$labelField, $codeField],
             null,
-            'bus_unit_code'
+            $codeField
         );
     }
 
     private function branches(array $params): array
     {
-        $companyId = ! empty($params['company_id']) ? (int) $params['company_id'] : null;
+        if (! ModelResolver::isEnabled('branch')) {
+            return [];
+        }
+
+        $companyId      = ! empty($params['company_id']) ? (int) $params['company_id'] : null;
         $businessUnitId = ! empty($params['business_unit_id']) ? (int) $params['business_unit_id'] : null;
 
-        if ($companyId && $businessUnitId) {
+        if ($companyId && $businessUnitId && ModelResolver::isEnabled('company') && ModelResolver::isEnabled('business_unit')) {
             $scoped = $this->branchesByCompanyAndBusinessUnit($companyId, $businessUnitId);
             if ($scoped !== []) {
                 return $scoped;
             }
         }
 
+        $codeField  = ModelResolver::fieldMap('branch', 'code', 'branch_code');
+        $labelField = ModelResolver::fieldMap('branch', 'label', 'name');
+
         return $this->mapOptions(
             ModelResolver::query('branch'),
             'id',
-            ['name', 'branch_code'],
+            [$labelField, $codeField],
             null,
-            'branch_code'
+            $codeField
         );
     }
 
     private function departments(array $params): array
     {
-        $companyId = ! empty($params['company_id']) ? (int) $params['company_id'] : null;
-        $businessUnitId = ! empty($params['business_unit_id']) ? (int) $params['business_unit_id'] : null;
-        $branchId = ! empty($params['branch_id']) ? (int) $params['branch_id'] : null;
-
-        if ($companyId && $businessUnitId && $branchId) {
-            return $this->departmentsFromMapping($companyId, $businessUnitId, $branchId);
+        if (! ModelResolver::isEnabled('department')) {
+            return [];
         }
 
-        if ($companyId && $businessUnitId) {
+        $companyId      = ! empty($params['company_id']) ? (int) $params['company_id'] : null;
+        $businessUnitId = ! empty($params['business_unit_id']) ? (int) $params['business_unit_id'] : null;
+        $branchId       = ! empty($params['branch_id']) ? (int) $params['branch_id'] : null;
+
+        if (
+            ModelResolver::isEnabled('company') && ModelResolver::isEnabled('business_unit')
+            && $companyId && $businessUnitId
+        ) {
+            if ($branchId && ModelResolver::isEnabled('branch')) {
+                return $this->departmentsFromMapping($companyId, $businessUnitId, $branchId);
+            }
+
             return $this->departmentsFromMapping($companyId, $businessUnitId, null);
         }
 
         return $this->allDepartments()->map(fn ($item) => [
             'value' => $this->departmentLabel($item),
-            'text' => $this->departmentLabel($item),
+            'text'  => $this->departmentLabel($item),
         ])->values()->all();
     }
 
     private function modules(array $params): array
     {
-        $query = ModelResolver::query('sidebar_menu');
+        if (! ModelResolver::isEnabled('module')) {
+            return [];
+        }
+
+        $query = ModelResolver::query('sidebar_menu') ?? ModelResolver::query('module');
         if (! $query) {
             return [];
         }
 
-        $query->where('status', 0)
-            ->whereNotNull('code')
-            ->where('code', '!=', '');
+        $labelField     = ModelResolver::fieldMap('module', 'label', 'name');
+        $codeField      = ModelResolver::fieldMap('module', 'code', 'code');
+        $referenceField = ModelResolver::fieldMap('module', 'reference', 'reference');
+        $statusCol      = ModelResolver::fieldMap('module', 'status_col', 'status');
+        $statusActive   = config('approval-mapping.field_maps.module.status_active', 0);
+
+        $query->where($statusCol, $statusActive)
+            ->whereNotNull($codeField)
+            ->where($codeField, '!=', '');
 
         if (! empty($params['search'])) {
             $keyword = '%'.strtolower((string) $params['search']).'%';
-            $query->where(function (Builder $builder) use ($keyword) {
-                $builder->whereRaw('LOWER(name) LIKE ?', [$keyword])
-                    ->orWhereRaw('LOWER(code) LIKE ?', [$keyword]);
+            $query->where(function (Builder $builder) use ($keyword, $labelField, $codeField) {
+                $builder->whereRaw("LOWER({$labelField}) LIKE ?", [$keyword])
+                    ->orWhereRaw("LOWER({$codeField}) LIKE ?", [$keyword]);
             });
         }
 
-        return $query->orderBy('name')->get()->map(function ($row) {
-            $name = trim((string) ($row->name ?? ''));
-            $code = trim((string) ($row->code ?? ''));
-            $label = $code !== '' ? "{$name} ({$code})" : ($name !== '' ? $name : (string) $row->reference);
+        return $query->orderBy($labelField)->get()->map(function ($row) use ($labelField, $codeField, $referenceField) {
+            $name  = trim((string) ($row->{$labelField} ?? ''));
+            $code  = trim((string) ($row->{$codeField} ?? ''));
+            $ref   = $row->{$referenceField} ?? null;
+            $label = $code !== '' ? "{$name} ({$code})" : ($name !== '' ? $name : (string) $ref);
 
             return [
-                'value' => $row->reference,
-                'text' => $label,
-                'code' => $code,
-                'name' => $name,
+                'value' => $ref,
+                'text'  => $label,
+                'code'  => $code,
+                'name'  => $name,
             ];
         })->values()->all();
+    }
+
+    private function userAssignGroups(): array
+    {
+        $labelField = ModelResolver::fieldMap('user_assign_group', 'label', 'group_name');
+
+        return $this->mapOptions(
+            ModelResolver::query('user_assign_group'),
+            'id',
+            [$labelField]
+        );
     }
 
     private function businessUnitsByCompany(int $companyId): array
     {
         $rows = $this->mappingJoin('business_unit', $companyId, null, null);
 
-        return collect($rows)->map(function ($row) {
+        $codeField  = ModelResolver::fieldMap('business_unit', 'code', 'bus_unit_code');
+        $labelField = ModelResolver::fieldMap('business_unit', 'label', 'name');
+
+        return collect($rows)->map(function ($row) use ($codeField, $labelField) {
             return [
                 'value' => $row->id,
-                'text' => $this->formatCodeName($row->bus_unit_code ?? '', $row->name ?? ''),
+                'text'  => $this->formatCodeName($row->{$codeField} ?? '', $row->{$labelField} ?? ''),
             ];
         })->values()->all();
     }
@@ -173,10 +230,13 @@ class ApprovalMappingLookupService
     {
         $rows = $this->mappingJoin('branch', $companyId, $businessUnitId, null);
 
-        return collect($rows)->map(function ($row) {
+        $codeField  = ModelResolver::fieldMap('branch', 'code', 'branch_code');
+        $labelField = ModelResolver::fieldMap('branch', 'label', 'name');
+
+        return collect($rows)->map(function ($row) use ($codeField, $labelField) {
             return [
                 'value' => $row->id,
-                'text' => $this->formatCodeName($row->branch_code ?? '', $row->name ?? ''),
+                'text'  => $this->formatCodeName($row->{$codeField} ?? '', $row->{$labelField} ?? ''),
             ];
         })->values()->all();
     }
@@ -185,12 +245,15 @@ class ApprovalMappingLookupService
     {
         $rows = $this->mappingJoin('department', $companyId, $businessUnitId, $branchId);
 
-        return collect($rows)->map(function ($row) {
-            $label = $this->formatCodeName($row->department_code ?? '', $row->name ?? '');
+        $codeField  = ModelResolver::fieldMap('department', 'code', 'department_code');
+        $labelField = ModelResolver::fieldMap('department', 'label', 'name');
+
+        return collect($rows)->map(function ($row) use ($codeField, $labelField) {
+            $label = $this->formatCodeName($row->{$codeField} ?? '', $row->{$labelField} ?? '');
 
             return [
                 'value' => $label,
-                'text' => $label,
+                'text'  => $label,
             ];
         })->values()->all();
     }
@@ -198,22 +261,22 @@ class ApprovalMappingLookupService
     private function mappingJoin(string $targetKey, int $companyId, ?int $businessUnitId, ?int $branchId): array
     {
         $mappingClass = ModelResolver::modelClass('company_branch_department');
-        $targetClass = ModelResolver::modelClass($targetKey);
+        $targetClass  = ModelResolver::modelClass($targetKey);
         if (! $mappingClass || ! $targetClass) {
             return [];
         }
 
-        $mappingModel = new $mappingClass;
-        $targetModel = new $targetClass;
-        $mappingTable = $mappingModel->getTable();
-        $targetTable = $targetModel->getTable();
-        $connection = $mappingModel->getConnectionName();
+        $mappingModel  = new $mappingClass;
+        $targetModel   = new $targetClass;
+        $mappingTable  = $mappingModel->getTable();
+        $targetTable   = $targetModel->getTable();
+        $connection    = $mappingModel->getConnectionName();
 
         $targetIdColumn = match ($targetKey) {
             'business_unit' => 'business_unit_id',
-            'branch' => 'branch_id',
-            'department' => 'department_id',
-            default => null,
+            'branch'        => 'branch_id',
+            'department'    => 'department_id',
+            default         => null,
         };
 
         if (! $targetIdColumn) {
@@ -238,17 +301,15 @@ class ApprovalMappingLookupService
             $query->where("{$mappingTable}.branch_id", $branchId);
         }
 
-        $selectColumns = match ($targetKey) {
-            'business_unit' => ["{$targetTable}.id", "{$targetTable}.name", "{$targetTable}.bus_unit_code"],
-            'branch' => ["{$targetTable}.id", "{$targetTable}.name", "{$targetTable}.branch_code"],
-            'department' => ["{$targetTable}.id", "{$targetTable}.name", "{$targetTable}.department_code"],
-            default => ["{$targetTable}.id", "{$targetTable}.name"],
-        };
+        $labelField = ModelResolver::fieldMap($targetKey, 'label', 'name');
+        $codeField  = ModelResolver::fieldMap($targetKey, 'code', "{$targetKey}_code");
+
+        $selectColumns = ["{$targetTable}.id", "{$targetTable}.{$labelField}", "{$targetTable}.{$codeField}"];
 
         return $query
             ->select($selectColumns)
             ->distinct()
-            ->orderBy("{$targetTable}.name")
+            ->orderBy("{$targetTable}.{$labelField}")
             ->get()
             ->all();
     }
@@ -260,12 +321,17 @@ class ApprovalMappingLookupService
             return collect();
         }
 
-        return $query->orderBy('name')->get();
+        $labelField = ModelResolver::fieldMap('department', 'label', 'name');
+
+        return $query->orderBy($labelField)->get();
     }
 
     private function departmentLabel(object $department): string
     {
-        return $this->formatCodeName($department->department_code ?? '', $department->name ?? '');
+        $codeField  = ModelResolver::fieldMap('department', 'code', 'department_code');
+        $labelField = ModelResolver::fieldMap('department', 'label', 'name');
+
+        return $this->formatCodeName($department->{$codeField} ?? '', $department->{$labelField} ?? '');
     }
 
     private function formatCodeName(?string $code, ?string $name): string
@@ -315,7 +381,7 @@ class ApprovalMappingLookupService
 
             return [
                 'value' => $row->{$valueField ?? $valueKey},
-                'text' => $label !== '' ? $label : (string) $row->{$valueKey},
+                'text'  => $label !== '' ? $label : (string) $row->{$valueKey},
             ];
         })->values()->all();
     }
