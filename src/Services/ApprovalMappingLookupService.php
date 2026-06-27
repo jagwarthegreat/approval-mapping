@@ -286,8 +286,11 @@ class ApprovalMappingLookupService
         $query = DB::connection($connection)
             ->table($mappingTable)
             ->join($targetTable, "{$mappingTable}.{$targetIdColumn}", '=', "{$targetTable}.id")
-            ->where("{$mappingTable}.company_id", $companyId)
-            ->whereNull("{$mappingTable}.deleted_at");
+            ->where("{$mappingTable}.company_id", $companyId);
+
+        if (in_array(\Illuminate\Database\Eloquent\SoftDeletes::class, class_uses_recursive($mappingClass), true)) {
+            $query->whereNull("{$mappingTable}.deleted_at");
+        }
 
         if (in_array(\Illuminate\Database\Eloquent\SoftDeletes::class, class_uses_recursive($targetClass), true)) {
             $query->whereNull("{$targetTable}.deleted_at");

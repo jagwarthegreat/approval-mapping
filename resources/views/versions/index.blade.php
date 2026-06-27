@@ -206,62 +206,67 @@
                                 <template x-for="level in details.level_columns" :key="'head-' + level">
                                     <th>
                                         <div style="display:flex;align-items:center;gap:6px;">
-                                            <button type="button" class="am-btn am-btn-icon" style="width:28px;height:28px;" @click="removeLevelColumn(level)" x-show="details.level_columns.length > 1">-</button>
                                             <span x-text="'Level ' + level"></span>
-                                            <button type="button" class="am-btn am-btn-icon am-btn-primary" style="width:28px;height:28px;" @click="addLevelColumn()" x-show="level === details.level_columns[details.level_columns.length - 1]">+</button>
                                         </div>
                                     </th>
                                 </template>
                                 <th>
-                                    <button type="button" class="am-btn am-btn-icon am-btn-primary" @click="addRow()">+</button>
+                                    <button type="button" class="am-btn am-btn-icon am-btn-primary" @click="addLevelColumn()">+</button>
                                 </th>
                             </tr>
                         </thead>
                         <tbody>
-                            <template x-for="(row, rowIndex) in filteredDetailRows()" :key="rowIndex + '-' + row.department">
-                                <tr>
-                                    <td x-show="appFeatures.department">
-                                        <template x-if="row._new">
-                                            <input type="text" class="am-input" x-model="row.department" placeholder="Department name">
-                                        </template>
-                                        <template x-if="!row._new">
-                                            <span x-text="row.department"></span>
-                                        </template>
-                                    </td>
-                                    <td x-show="appFeatures.branch">
-                                        <select class="am-select" x-model="row.branch_id">
-                                            <option value="">Select branch</option>
-                                            <template x-for="branch in detailBranchOptions()" :key="branch.value">
-                                                <option :value="branch.value" x-text="branch.text"></option>
+                            <template x-for="(group, groupIndex) in filteredDetailGroups()" :key="'group-' + groupIndex + '-' + group.department">
+                                <template x-for="(subRow, subRowIndex) in group.subRows" :key="'subrow-' + groupIndex + '-' + subRowIndex">
+                                    <tr>
+                                        <td x-show="appFeatures.department">
+                                            <template x-if="subRowIndex === 0 && group._new">
+                                                <input type="text" class="am-input" x-model="group.department" placeholder="Department name">
                                             </template>
-                                        </select>
-                                    </td>
-                                    <td>
-                                        <select class="am-select" x-model="row.type">
-                                            <option value="direct">Direct</option>
-                                            <option value="agency">Agency</option>
-                                        </select>
-                                    </td>
-                                    <template x-for="level in details.level_columns" :key="'cell-' + rowIndex + '-' + level">
-                                        <td>
-                                            <div class="am-level-cell">
-                                                <template x-for="(groupId, groupIndex) in row.cells[level]" :key="groupIndex">
-                                                    <select class="am-select" x-model="row.cells[level][groupIndex]">
-                                                        <option value="">Select approver group</option>
-                                                        <template x-for="group in lookups.userAssignGroups" :key="group.value">
-                                                            <option :value="group.value" x-text="group.text"></option>
-                                                        </template>
-                                                    </select>
-                                                    <button type="button" class="am-btn am-btn-icon am-btn-danger" style="width:28px;height:28px;" @click="removeApprover(row, level, groupIndex)">-</button>
+                                            <template x-if="subRowIndex === 0 && !group._new">
+                                                <span x-text="group.department"></span>
+                                            </template>
+                                        </td>
+                                        <td x-show="appFeatures.branch">
+                                            <select class="am-select" x-model="subRow.branch_id">
+                                                <option value="">Select branch</option>
+                                                <template x-for="branch in detailBranchOptions()" :key="branch.value">
+                                                    <option :value="branch.value" x-text="branch.text"></option>
                                                 </template>
-                                                <button type="button" class="am-btn am-btn-icon" style="width:28px;height:28px;" @click="addApprover(row, level)">+</button>
+                                            </select>
+                                        </td>
+                                        <td>
+                                            <select class="am-select" x-model="subRow.type">
+                                                <option value="direct">Direct</option>
+                                                <option value="agency">Agency</option>
+                                            </select>
+                                        </td>
+                                        <template x-for="level in details.level_columns" :key="'cell-' + groupIndex + '-' + subRowIndex + '-' + level">
+                                            <td>
+                                                <div class="am-level-cell">
+                                                    <template x-for="(groupId, groupIdIndex) in subRow.cells[level]" :key="groupIdIndex">
+                                                        <div style="display:flex;align-items:center;gap:6px;">
+                                                            <select class="am-select" x-model="subRow.cells[level][groupIdIndex]">
+                                                                <option value="">Select approver group</option>
+                                                                <template x-for="groupOption in lookups.userAssignGroups" :key="groupOption.value">
+                                                                    <option :value="groupOption.value" x-text="groupOption.text"></option>
+                                                                </template>
+                                                            </select>
+                                                            <button type="button" class="am-btn am-btn-icon am-btn-danger" style="width:28px;height:28px;" @click="removeApprover(subRow, level, groupIdIndex)">-</button>
+                                                        </div>
+                                                    </template>
+                                                    <button type="button" class="am-btn am-btn-icon" style="width:28px;height:28px;" @click="addApprover(subRow, level)">+</button>
+                                                </div>
+                                            </td>
+                                        </template>
+                                        <td>
+                                            <div style="display:flex;align-items:center;gap:6px;">
+                                                <button type="button" class="am-btn am-btn-icon am-btn-danger" @click="removeSubRow(groupIndex, subRowIndex)">&#128465;</button>
+                                                <button type="button" class="am-btn am-btn-icon am-btn-success" x-show="subRowIndex === group.subRows.length - 1" @click="addSubRow(group)">+</button>
                                             </div>
                                         </td>
-                                    </template>
-                                    <td>
-                                        <button type="button" class="am-btn am-btn-icon am-btn-success" @click="addRow()">+</button>
-                                    </td>
-                                </tr>
+                                    </tr>
+                                </template>
                             </template>
                         </tbody>
                     </table>
@@ -326,7 +331,7 @@ function approvalMappingApp() {
         lookups: { companies: [], businessUnits: [], modules: [], branches: [], departments: [], userAssignGroups: [] },
         detailLookups: { branches: [], departments: [] },
         versionForm: { open: false, id: null, version: '', company_id: '', business_unit_id: '', module_reference: '', effective_from: '', effective_to: '', is_active: true, notes: '' },
-        details: { open: false, version: null, level_columns: [1], rows: [], departmentSearch: '' },
+        details: { open: false, version: null, level_columns: [1], groups: [], departmentSearch: '' },
         saveAsNew: { open: false, new_version: '', effective_from: '', notes: '' },
 
         async init() {
@@ -558,13 +563,31 @@ function approvalMappingApp() {
                 const data = await this.request(`versions/${version.id}/details`);
                 this.details.version = data.version;
                 this.details.level_columns = data.level_columns?.length ? data.level_columns : [1];
-                this.details.rows = (data.rows || []).map(row => ({
-                    ...row,
-                    branch_id: row.branch_id || '',
-                    type: row.type || 'direct',
-                    cells: this.normalizeCells(row.cells || {}, this.details.level_columns),
-                    _new: false,
-                }));
+                const groupMap = {};
+                (data.rows || []).forEach(row => {
+                    const department = row.department || 'Default';
+                    if (!groupMap[department]) {
+                        groupMap[department] = {
+                            department,
+                            _new: false,
+                            subRows: [],
+                        };
+                    }
+
+                    groupMap[department].subRows.push({
+                        branch_id: row.branch_id ? String(row.branch_id) : '',
+                        type: row.type || 'direct',
+                        cells: this.normalizeCells(row.cells || {}, this.details.level_columns),
+                    });
+                });
+                this.details.groups = Object.values(groupMap);
+                if (this.details.groups.length === 0) {
+                    this.details.groups = [{
+                        department: this.appFeatures.department ? '' : 'Default',
+                        _new: this.appFeatures.department,
+                        subRows: [this.createEmptySubRow()],
+                    }];
+                }
                 this.details.departmentSearch = '';
 
                 const loaders = [];
@@ -594,27 +617,29 @@ function approvalMappingApp() {
             const normalized = {};
             levels.forEach(level => {
                 const value = cells[level] ?? cells[String(level)] ?? [];
-                normalized[level] = Array.isArray(value) && value.length ? value.map(v => String(v)) : [''];
+                normalized[level] = Array.isArray(value) && value.length ? value.map(v => String(v)) : [];
             });
             return normalized;
         },
 
-        filteredDetailRows() {
+        filteredDetailGroups() {
             if (!this.appFeatures.department) {
-                return this.details.rows;
+                return this.details.groups;
             }
             const keyword = (this.details.departmentSearch || '').toLowerCase();
             if (!keyword) {
-                return this.details.rows;
+                return this.details.groups;
             }
-            return this.details.rows.filter(row => (row.department || '').toLowerCase().includes(keyword));
+            return this.details.groups.filter(group => (group.department || '').toLowerCase().includes(keyword));
         },
 
         addLevelColumn() {
             const next = Math.max(...this.details.level_columns, 0) + 1;
             this.details.level_columns.push(next);
-            this.details.rows.forEach(row => {
-                row.cells[next] = [''];
+            this.details.groups.forEach(group => {
+                group.subRows.forEach(subRow => {
+                    subRow.cells[next] = [];
+                });
             });
         },
 
@@ -623,55 +648,72 @@ function approvalMappingApp() {
                 return;
             }
             this.details.level_columns = this.details.level_columns.filter(l => l !== level);
-            this.details.rows.forEach(row => delete row.cells[level]);
-        },
-
-        addApprover(row, level) {
-            if (!Array.isArray(row.cells[level])) {
-                row.cells[level] = [''];
-            } else {
-                row.cells[level].push('');
-            }
-        },
-
-        removeApprover(row, level, index) {
-            row.cells[level].splice(index, 1);
-            if (row.cells[level].length === 0) {
-                row.cells[level] = [''];
-            }
-        },
-
-        addRow() {
-            const cells = {};
-            this.details.level_columns.forEach(level => cells[level] = ['']);
-            this.details.rows.push({
-                department: this.appFeatures.department ? '' : 'Default',
-                branch_id: '',
-                type: 'direct',
-                cells,
-                _new: true,
+            this.details.groups.forEach(group => {
+                group.subRows.forEach(subRow => delete subRow.cells[level]);
             });
         },
 
+        addApprover(subRow, level) {
+            if (!Array.isArray(subRow.cells[level])) {
+                subRow.cells[level] = [];
+            }
+            subRow.cells[level].push('');
+        },
+
+        removeApprover(subRow, level, index) {
+            subRow.cells[level].splice(index, 1);
+            if (subRow.cells[level].length === 0) {
+                subRow.cells[level] = [];
+            }
+        },
+
+        createEmptySubRow() {
+            const cells = {};
+            this.details.level_columns.forEach(level => cells[level] = []);
+
+            return {
+                branch_id: '',
+                type: 'direct',
+                cells,
+            };
+        },
+
+        addSubRow(group) {
+            group.subRows.push(this.createEmptySubRow());
+        },
+
+        removeSubRow(groupIndex, subRowIndex) {
+            const group = this.details.groups[groupIndex];
+            if (!group) {
+                return;
+            }
+
+            group.subRows.splice(subRowIndex, 1);
+            if (group.subRows.length === 0) {
+                this.details.groups.splice(groupIndex, 1);
+            }
+        },
+
         buildRowsPayload() {
-            return this.details.rows
-                .filter(row => {
-                    const hasDept = this.appFeatures.department ? !!row.department : true;
-                    const hasBranch = this.appFeatures.branch ? !!row.branch_id : true;
+            return this.details.groups
+                .flatMap(group => group.subRows.map(subRow => ({ group, subRow })))
+                .filter(({ group, subRow }) => {
+                    const hasDept = this.appFeatures.department ? !!group.department : true;
+                    const hasBranch = this.appFeatures.branch ? !!subRow.branch_id : true;
                     return hasDept && hasBranch;
                 })
-                .map(row => {
+                .map(({ group, subRow }) => {
                     const levels = {};
                     this.details.level_columns.forEach(level => {
-                        levels[String(level)] = (row.cells[level] || [])
+                        levels[String(level)] = (subRow.cells[level] || [])
                             .map(v => parseInt(v, 10))
                             .filter(v => v > 0);
                     });
 
                     return {
-                        department: row.department || 'Default',
-                        branch_id: this.appFeatures.branch ? parseInt(row.branch_id, 10) : 0,
-                        type: row.type || 'direct',
+                        department: group.department || 'Default',
+                        branch_id: this.appFeatures.branch ? parseInt(subRow.branch_id, 10) : 0,
+                        type: subRow.type || 'direct',
                         levels,
                     };
                 });

@@ -111,18 +111,36 @@ class ApprovalMappingVersionService
         if ($departments->isNotEmpty()) {
             foreach ($departments as $department) {
                 $label = $this->departmentLabel($department);
-                $match = $mappedRows[$label] ?? null;
+                $matches = $mappedRows[$label] ?? [];
+
+                if ($matches !== []) {
+                    foreach ($matches as $match) {
+                        $rows[] = [
+                            'department' => $label,
+                            'branch_id' => $match['branch_id'] ?? null,
+                            'branch_name' => $match['branch_name'] ?? '',
+                            'type' => $match['type'] ?? 'direct',
+                            'cells' => $match['cells'] ?? $this->emptyCells($levelColumns),
+                        ];
+                    }
+
+                    continue;
+                }
 
                 $rows[] = [
                     'department' => $label,
-                    'branch_id' => $match['branch_id'] ?? null,
-                    'branch_name' => $match['branch_name'] ?? '',
-                    'type' => $match['type'] ?? 'direct',
-                    'cells' => $match['cells'] ?? $this->emptyCells($levelColumns),
+                    'branch_id' => null,
+                    'branch_name' => '',
+                    'type' => 'direct',
+                    'cells' => $this->emptyCells($levelColumns),
                 ];
             }
         } else {
-            $rows = array_values($mappedRows);
+            foreach ($mappedRows as $departmentRows) {
+                foreach ($departmentRows as $departmentRow) {
+                    $rows[] = $departmentRow;
+                }
+            }
         }
 
         return [
@@ -291,7 +309,7 @@ class ApprovalMappingVersionService
                     : [];
             }
 
-            $rows[(string) $mapping->department] = [
+            $rows[(string) $mapping->department][] = [
                 'department' => (string) $mapping->department,
                 'branch_id' => $mapping->branch_id,
                 'branch_name' => $mapping->branch?->name ?? '',
